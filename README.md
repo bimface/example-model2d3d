@@ -1,9 +1,10 @@
 # 功能介绍
 
-基于BIMFACE的拓展功能，可以对接一些空调设备、能源检测的传感器，以此达到BIM+物联网的功能。选中某一个设备的时候，可以实时显示设备的数据信息，同时也可以远程操控设备。
+基于BIMFACE的拓展功能，可实现二三维场景联动，并且增加图表联动功能。
 
 # 效果图
-![view](resources/img/view.png)
+![view](resources/img/img1.png)
+![view](resources/img/img2.png)
 
 # 主要逻辑
 
@@ -18,91 +19,110 @@
 ## 定义DOM元素，用于在该DOM元素中显示模型或图纸
 ```javascript
 <div id="view3d"></div>
+<div id="view2d"></div>
 ```
 ## 模型初始化
 ```javascript
-var options = new BimfaceSDKLoaderConfig();
-options.viewToken = viewToken;
-BimfaceSDKLoader.load(options, successCallback, failureCallback);
+var viewToken = this.state.viewToken;
+        var options = new BimfaceSDKLoaderConfig();
+        options.viewToken = viewToken;
+        BimfaceSDKLoader.load(options, successCallback, failureCallback);
 
-function successCallback() {
-// 获取DOM元素
-var dom4Show = document.getElementById('view3d');
-var webAppConfig = new Glodon.Bimface.Application.WebApplication3DConfig();
-webAppConfig.domElement = dom4Show;
+        function successCallback(viewMetaData) {
+            // 获取DOM元素
+            var dom3d = document.getElementById('view3d');
 
-// 创建WebApplication
-window.app = new Glodon.Bimface.Application.WebApplication3D(webAppConfig);
+            // 配置参数
+            var config = new Glodon.Bimface.Application.WebApplication3DConfig();
+            config.domElement = dom3d;
+            config.Toolbars = [];
 
-// 添加待显示的模型
-app.addView(viewToken);
+            // 创建viewer3D对象
+            window.app = new Glodon.Bimface.Application.WebApplication3D(config);
 
-// 监听添加view完成的事件
-app.addEventListener(Glodon.Bimface.Application.WebApplication3DEvent.ViewAdded, function () {
+            // 添加模型
+            app.addView(viewToken);
 
-  // 渲染3D模型
-  app.render();
+            window.ViewerEvent3D = Glodon.Bimface.Viewer.Viewer3DEvent;
 
-  // 从WebApplication获取viewer3D对象
-  window.viewer3D = app.getViewer();
+            app.addEventListener(ViewerEvent3D.ComponentsSelectionChanged,function(el){
+                var did = viewerDrawing.fromRevitId(el.objectId);
+                if(did){
+                    viewerDrawing.zoomToObject(did);
+                }
+            })
 
-  // 初始化DrawableContainer
-  var drawableConfig = new Glodon.Bimface.Plugins.Drawable.DrawableContainerConfig();
-  drawableConfig.viewer = window.viewer3D;
-  window.drawableContainer = new Glodon.Bimface.Plugins.Drawable.DrawableContainer(drawableConfig);
-});
+            // 监听添加view完成的事件
+            app.addEventListener(Glodon.Bimface.Viewer.Viewer3DEvent.ViewAdded, function() {
+                // 渲染3D模型
+                app.render();
+                window.viewer3D = app.getViewer();
+                viewer3D.hideViewHouse();
 
-};
-function failureCallback(error) {
-console.log(error);
-};
+                var options2d = new BimfaceSDKLoaderConfig();
+                options2d.viewToken = viewToken;
+                options2d.viewType = BimfaceViewTypeOption.DrawingView;
+                BimfaceSDKLoader.load(options2d, successCallback2d, failureCallback2d);
+
+                function successCallback2d(viewMetaData) {
+                    var dom2d = document.getElementById('view2d');
+                    var config2d = new Glodon.Bimface.Viewer.ViewerDrawingConfig();
+                    config2d.domElement = dom2d;
+
+                    window.viewerDrawing = new Glodon.Bimface.Viewer.ViewerDrawing(config2d);
+
+                    window.drawingUrl = viewMetaData.drawingUrl;
+
+                    viewerDrawing.load(viewToken,'382617');
+                    window.ViewerEvent = Glodon.Bimface.Viewer.ViewerDrawingEvent;
+                    viewerDrawing.addEventListener(ViewerEvent.ComponentsSelectionChanged,function(el){
+                        if(el && el.length > 0){
+                            var rid = viewerDrawing.toRevitId(el[0]);
+                            viewer3D.clearIsolation();
+                            viewer3D.isolateComponentsById([rid], Glodon.Bimface.Viewer.IsolateOption.MakeOthersTranslucent);
+                            viewer3D.setSelectedComponentsById([rid]);
+                            viewer3D.zoomToSelectedComponents();
+                        }
+                    })
+
+                }
+
+                function failureCallback2d(error){
+                    console.log(error);
+                }
+
+            })
+        }
+
+        function failureCallback(error) {
+            console.log(error);
+        };
 
 ```
 ## 用到的JSSDK方法
-  * 改变构件颜色
+  * 清除隔离
 ```javascript
-let modeColor = new Glodon.Web.Graphics.Color(0,255,0,100);
-viewer3D.overrideComponentsColorById(me.componentsColor,modeColor);
+viewer3D.clearIsolation();
 ```		
-  * 还原构件颜色
+  * 隔离构件
 ```javascript
-viewer3D.restoreComponentsColorById(me.componentsColor);
+viewer3D.isolateComponentsById([rid], Glodon.Bimface.Viewer.IsolateOption.MakeOthersTranslucent);
 ```
-  * 添加标签以及标签操作
+  * 选中构件
 ```javascript
-//循环标签数组
-for(let i=0;i<me.tagArray.length;i++){
-  if(me.tagArray[i].isOn){
-    //获取构件属性
-    viewer3D.getComponentProperty(me.tagArray[i].id,function(data){
-      let _worldPosition = new Object();
-      _worldPosition.x = (data.boundingBox.max.x + data.boundingBox.min.x)/2;
-      _worldPosition.y = (data.boundingBox.max.y + data.boundingBox.min.y)/2;
-      _worldPosition.z = (data.boundingBox.max.z + data.boundingBox.min.z)/2;
-      
-      //配置自定义标签
-      var config = new Glodon.Bimface.Plugins.Drawable.CustomItemConfig();
-      var circle = document.createElement('div');
-      circle.className = 'bln';
-      config.content = circle;
-      config.viewer = window.viewer3D;
-      config.index = i;
-      config.worldPosition = _worldPosition;
-
-      //生成customItem实例
-      var customItem = new Glodon.Bimface.Plugins.Drawable.CustomItem(config);
-      //标签点击事件
-      customItem.onClick(function(item) {
-        me.selectTag(item._config.index);
-        viewer3D.setCameraStatus(me.tagArray[i].cameraStatus);
-      });
-
-      me.tagList.push(customItem);
-    })
-  }
-}
-//添加标签
-drawableContainer.addItems(me.tagList);
+viewer3D.setSelectedComponentsById([rid]);
+```
+  * 缩放到加入选中集合的构件
+```javascript
+viewer3D.zoomToSelectedComponents();
+```
+  * 2D构件转换为3D构件
+```javascript
+viewerDrawing.toRevitId(el[0]);
+```
+  * 3D构件转换为2D构件
+```javascript
+viewerDrawing.fromRevitId(el.objectId);
 ```
 
 ## 显示实时耗电量的折线图
@@ -111,10 +131,10 @@ drawableContainer.addItems(me.tagList);
 
 ## 注
 
-ps. 该Demo基于vue+webpack进行开发打包，如用jquery/React实现同上。
+ps. 该Demo基于react+webpack进行开发打包，如用jquery/Vue实现同上。
 
 参考API：[http://doc.bimface.com/book/js/articles/basic/index.html](http://doc.bimface.com/book/js/articles/basic/index.html)
 
 # 查看示例
 
-[http://bimface.com/example/energy](http://bimface.com/example/energy)
+[http://bimface.com/example/model2d3d](http://bimface.com/example/model2d3d)

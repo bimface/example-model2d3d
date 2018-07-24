@@ -125,7 +125,7 @@ viewerDrawing.toRevitId(el[0]);
 viewerDrawing.fromRevitId(el.objectId);
 ```
 
-## 显示实时耗电量的折线图
+## 图表开发
 
 基于highcharts进行开发
 

@@ -118,11 +118,11 @@ viewer3D.zoomToSelectedComponents();
 ```
   * 2D构件转换为3D构件
 ```javascript
-viewerDrawing.toRevitId(el[0]);
+viewerDrawing.toDrawingId(el[0]);
 ```
   * 3D构件转换为2D构件
 ```javascript
-viewerDrawing.fromRevitId(el.objectId);
+viewerDrawing.toModelId(el.objectId);
 ```
 
 ## 图表开发

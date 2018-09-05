@@ -46,7 +46,7 @@ var viewToken = this.state.viewToken;
             window.ViewerEvent3D = Glodon.Bimface.Viewer.Viewer3DEvent;
 
             app.addEventListener(ViewerEvent3D.ComponentsSelectionChanged,function(el){
-                var did = viewerDrawing.fromRevitId(el.objectId);
+                var did = viewerDrawing.toDrawingId(el.objectId);
                 if(did){
                     viewerDrawing.zoomToObject(did);
                 }
@@ -77,7 +77,7 @@ var viewToken = this.state.viewToken;
                     window.ViewerEvent = Glodon.Bimface.Viewer.ViewerDrawingEvent;
                     viewerDrawing.addEventListener(ViewerEvent.ComponentsSelectionChanged,function(el){
                         if(el && el.length > 0){
-                            var rid = viewerDrawing.toRevitId(el[0]);
+                            var rid = viewerDrawing.toModelId(el[0]);
                             viewer3D.clearIsolation();
                             viewer3D.isolateComponentsById([rid], Glodon.Bimface.Viewer.IsolateOption.MakeOthersTranslucent);
                             viewer3D.setSelectedComponentsById([rid]);
